@@ -119,3 +119,16 @@ Color Color::Tonemap(Color color)
 {
 	return Tonemap(color.GetR(), color.GetG(), color.GetB(), color.GetA());
 }
+
+bool Color::operator==(const Color& other) const
+{
+    return m_r == other.m_r &&
+        m_g == other.m_g &&
+        m_b == other.m_b &&
+        m_a == other.m_a;
+}
+
+bool Color::operator!=(const Color& other) const
+{
+    return !(*this == other);
+}

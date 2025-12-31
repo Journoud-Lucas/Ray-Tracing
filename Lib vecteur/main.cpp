@@ -15,6 +15,12 @@
 #include "Sphere.h"
 #include "Scene.h"
 
+
+// Rajouter d'autre formes
+// Triangles, plan par exemple
+// bvh mes couilles
+// Importation obj
+
 template <typename T>
 std::vector<std::vector<T>> chunksOf(size_t n, const std::vector<T>& data)
 {
@@ -56,6 +62,31 @@ Image withImageParallel(int w, int h, Func f)
     return img;
 }
 
+Sphere* LightToObject(const Light& light)
+{
+    if (light.GetBehavior().type == LightBehaviorType::SphereLight)
+    {
+        Sphere* s = light.GetBehavior().sphere;
+        Sphere* lightObj = new Sphere(s->GetCenter(), s->GetRadius(), Material(1, 1, 1, MaterialBehavior::Diffuse, Color(0, 0, 0)));
+        lightObj->SetAsLight(true);
+        return lightObj;
+    }
+    return nullptr;
+}
+
+std::optional<Light> ObjectToLight(const Sphere& sphere)
+{
+    Color black(0, 0, 0);
+    if (sphere.GetMaterial().GetEmission() != black)
+    {
+        LightBehavior behavior(const_cast<Sphere*>(&sphere));
+        return Light(behavior, sphere.GetMaterial().GetEmission());
+    }
+    return std::nullopt;
+}
+
+
+
 /// <summary>
 /// Entry point of the program.
 /// Demonstrates the creation of a Point and a Direction.
@@ -64,22 +95,46 @@ Image withImageParallel(int w, int h, Func f)
 int main()
 {
     const int width = 500;
-    const int height = 500;
+    const int height = 500; 
 
     Scene scene;
     double sphereRadius = 5000;
 
-    scene.AddObject(Sphere(Point(sphereRadius + 500, 250, 0), sphereRadius, Material(0.6, 0.6, 0, MaterialBehavior::Diffuse))); // Right
-    scene.AddObject(Sphere(Point(-sphereRadius, 250, 0), sphereRadius, Material(0, 0.6, 0.6, MaterialBehavior::Diffuse))); // Left
-    scene.AddObject(Sphere(Point(250, -sphereRadius, 0), sphereRadius, Material(0.6, 0.6, 0.6, MaterialBehavior::Diffuse))); // Top
-    scene.AddObject(Sphere(Point(250, sphereRadius + 500, 0), sphereRadius, Material(0.6, 0.6, 0.6, MaterialBehavior::Diffuse))); // Bottom
-    scene.AddObject(Sphere(Point(250, 250, sphereRadius + 500), sphereRadius, Material(0.6, 0.6, 0.6, MaterialBehavior::Diffuse))); // Back
-    scene.AddObject(Sphere(Point(150, 350, 250), 100, Material(1, 1, 1, MaterialBehavior::Mirror))); // Sphere 1
-    scene.AddObject(Sphere(Point(350, 350, 250), 100, Material(1, 1, 1, MaterialBehavior::Glass, 2.4))); // Sphere 2
+    Color black(0, 0, 0);
 
-    scene.AddLight(Light(Point(250, 250, 250), Color(30000, 30000, 30000)));
-    scene.AddLight(Light(Point(50, 250, 250), Color(30000, 10000, 10000)));
-    scene.AddLight(Light(Point(450, 250, 250), Color(0, 10000, 30000)));
+    scene.AddObject(Sphere(Point(sphereRadius + 500, 250, 0), sphereRadius, Material(0.6, 0.6, 0, MaterialBehavior::Diffuse, black))); // Right
+    scene.AddObject(Sphere(Point(-sphereRadius, 250, 0), sphereRadius, Material(0, 0.6, 0.6, MaterialBehavior::Diffuse, black))); // Left
+    scene.AddObject(Sphere(Point(250, -sphereRadius, 0), sphereRadius, Material(0.6, 0.6, 0.6, MaterialBehavior::Diffuse, black))); // Top
+    scene.AddObject(Sphere(Point(250, sphereRadius + 500, 0), sphereRadius, Material(0.6, 0.6, 0.6, MaterialBehavior::Diffuse, black))); // Bottom
+    scene.AddObject(Sphere(Point(250, 250, sphereRadius + 500), sphereRadius, Material(0.6, 0.6, 0.6, MaterialBehavior::Diffuse, black))); // Back
+    scene.AddObject(Sphere(Point(150, 350, 250), 100, Material(1, 1, 1, MaterialBehavior::Mirror, black))); // Sphere 1
+    scene.AddObject(Sphere(Point(350, 350, 250), 100, Material(1, 1, 1, MaterialBehavior::Glass, black, 2.4))); // Sphere 2
+    scene.AddObject(Sphere(Point(250, 150, 250), 30, Material(1.0, 1.0, 1.0, MaterialBehavior::Diffuse, Color(10000, 10000, 10000)))); // Small sphere for light
+
+
+    scene.AddLight(Light(LightBehavior(Point(50, 250, 250)), Color(30000, 10000, 10000)));
+    scene.AddLight(Light(LightBehavior(Point(450, 250, 250)), Color(10000, 10000, 30000)));
+
+
+    /*
+    for (const Light& light : scene.GetLights())
+    {
+        Sphere* obj = LightToObject(light);
+        if (obj)
+        {
+            scene.AddObject(*obj);
+        }
+    }
+    */
+
+    for (const Sphere& sphere : scene.GetObjects())
+    {
+        auto lightOpt = ObjectToLight(sphere);
+        if (lightOpt)
+        {
+            scene.AddLight(*lightOpt);
+        }
+    }
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -107,7 +162,7 @@ int main()
             Direction dir = (pFar - pNear).Normalized();
             Ray ray(pNear, dir);
 
-            auto colOpt = Sphere::RadianceSpheres(ray, scene, 0, rng);
+            auto colOpt = Sphere::RadianceSpheres(ray, scene, 0, true, rng);
 
             if (colOpt.has_value())
             {

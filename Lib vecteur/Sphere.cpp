@@ -19,6 +19,7 @@ Sphere::Sphere(const Point& center, double radius, Material material) : m_materi
 {
     m_center = center;
     m_radius = radius;
+    m_isLightSphere = false;
 }
 
 /// <summary>
@@ -73,23 +74,23 @@ double Sphere::RayIntersectSphere(const Ray& ray) const
 /// <param name="ray">The ray to test for intersection.</param>
 /// <returns>A pair containing the closest intersection distance and a pointer to the hit sphere (or nullptr if no intersection).</returns>
 std::pair<double, Sphere*> Sphere::RayIntersectSpheres(
-    std::vector<Sphere> spheres,
+    const std::vector<Sphere>& spheres,
     const Ray& ray)
 {
-    std::pair<double, Sphere*> closest = { RayTracer::NO_INTERSECTION, nullptr };
+    std::pair<double, Sphere*> closest{ RayTracer::NO_INTERSECTION, nullptr };
 
-    for (Sphere& sphere : spheres)
+    for (const Sphere& sphere : spheres)
     {
-        double intersection = sphere.RayIntersectSphere(ray);
-        if (intersection != RayTracer::NO_INTERSECTION &&
-            (closest.first == RayTracer::NO_INTERSECTION || intersection < closest.first)) {
-            closest = { intersection, &sphere };
+        double t = sphere.RayIntersectSphere(ray);
+        if (t != RayTracer::NO_INTERSECTION &&
+            (closest.first == RayTracer::NO_INTERSECTION || t < closest.first))
+        {
+            closest = { t, const_cast<Sphere*>(&sphere) };
         }
     }
-
     return closest;
-
 }
+
 
 /// <summary>
 /// Computes the radiance color for a ray intersecting multiple spheres using Russian Roulette.
@@ -104,6 +105,7 @@ std::optional<Color> Sphere::RadianceSpheres(
     const Ray& ray,
     Scene& scene,
     int depth,
+    bool lastWasSpecular,
 	RNG& rng
 )
 {
@@ -117,7 +119,7 @@ std::optional<Color> Sphere::RadianceSpheres(
 
     if (r < coefRR)
     {
-        auto colOpt = SubRadiance(ray, scene, depth, rng);
+        auto colOpt = SubRadiance(ray, scene, depth, lastWasSpecular, rng);
         if (!colOpt)
         {
             return std::nullopt;
@@ -132,40 +134,77 @@ std::optional<Color> Sphere::RadianceSpheres(
     }
 }
 
-Color Sphere::DirectLighting(const Point& intersectionPoint, const Direction& normal,
-    const Material& material, const Light& light, const std::vector<Sphere>& spheres)
+Color Sphere::DirectLighting(
+    const Point& intersectionPoint,
+    const Direction& normal,
+    const Material& material,
+    const Light& light,
+    const std::vector<Sphere>& spheres,
+    RNG& rng
+)
 {
-    Direction directionToLight = light.GetPosition() - intersectionPoint;
+    Direction directionToLight;
+    double coefNormLight = 1.0;
+
+    if (light.GetBehavior().type == LightBehaviorType::PointLight)
+    {
+        directionToLight = light.GetPosition() - intersectionPoint;
+        coefNormLight = 1.0;
+    }
+    else
+    {
+        Sphere* lightSphere = light.GetBehavior().sphere;
+        double radius = lightSphere->GetRadius();
+        Point center = lightSphere->GetCenter();
+
+        auto [localDir, pdf] = Sphere::SampleCosinus(rng);
+
+        Direction axis = (center - intersectionPoint).Normalized();
+        Direction sampledDir = Direction::RotateVector(axis, localDir);
+
+        Point pointOnLight = center + radius * sampledDir;
+
+        directionToLight = pointOnLight - intersectionPoint;
+        Direction normalLight = (pointOnLight - center).Normalized();
+        Direction wi = directionToLight.Normalized();
+
+        double cosLight = std::max(0.0, -normalLight.Dot(wi));
+
+        double coefNormLight = cosLight / pdf;
+    }
+
     double lightDistanceSquared = directionToLight.Dot(directionToLight);
-    Direction directionToLightNormalized = directionToLight.Normalized();
+    Direction wi = directionToLight.Normalized();
 
-    // Lambert coefficient
-    double coeff = std::max(0.0, normal.Dot(directionToLightNormalized)
-        / (std::numbers::pi * lightDistanceSquared));
+    double sqrtD = std::sqrt(lightDistanceSquared);
+    //TODO: Optimize this
+    double maxDistance = lightDistanceSquared + 4 * RayTracer::EPSILON * RayTracer::EPSILON - 4 * RayTracer::EPSILON * sqrtD;
 
-    // Occlusion test (shadow)
-    Ray shadowRay(intersectionPoint + RayTracer::EPSILON * directionToLightNormalized,
-        directionToLightNormalized);
-
-    bool visible = true;
+    Ray shadowRay(intersectionPoint + RayTracer::EPSILON * wi, wi);
     for (const Sphere& sphere : spheres)
     {
+        if (&sphere == light.GetBehavior().sphere || sphere.IsLightSphere())
+            continue;
         double t = sphere.RayIntersectSphere(shadowRay);
-        if (t != RayTracer::NO_INTERSECTION && t * t < lightDistanceSquared)
+        if (t != RayTracer::NO_INTERSECTION && t * t < maxDistance)
         {
-            visible = false;
-            break;
+            return Color(0, 0, 0);
         }
     }
 
-    Color visibility = visible ? Color(1, 1, 1) : Color(0, 0, 0);
+    double cosTheta = std::max(0.0, normal.Dot(wi));
+    if (cosTheta <= 0.0)
+        return Color(0, 0, 0);
+
+    double coeff = coefNormLight * cosTheta / (std::numbers::pi * lightDistanceSquared);
 
     return Color(
-        visibility.GetR() * coeff * material.GetR() * light.GetEmission().GetR(),
-        visibility.GetG() * coeff * material.GetG() * light.GetEmission().GetG(),
-        visibility.GetB() * coeff * material.GetB() * light.GetEmission().GetB()
+        coeff * material.GetR() * light.GetEmission().GetR(),
+        coeff * material.GetG() * light.GetEmission().GetG(),
+        coeff * material.GetB() * light.GetEmission().GetB()
     );
 }
+
 
 /// <summary>
 /// Computes the sub-radiance color for a ray intersecting multiple spheres.
@@ -176,7 +215,7 @@ Color Sphere::DirectLighting(const Point& intersectionPoint, const Direction& no
 /// <param name="lightEmission">Color of the light source.</param>
 /// <param name="depth">Current recursion depth.</param>
 /// <returns>The color based on the closest intersection distance.</returns>
-std::optional<Color> Sphere::SubRadiance(const Ray& ray, Scene& scene, int depth, RNG& rng)
+std::optional<Color> Sphere::SubRadiance(const Ray& ray, Scene& scene, int depth, bool lastWasSpecular, RNG& rng)
 {
     if (depth > RayTracer::MAX_DEPTH)
     {
@@ -213,7 +252,8 @@ std::optional<Color> Sphere::SubRadiance(const Ray& ray, Scene& scene, int depth
                     normal,
                     hitSphere->GetMaterial(),
                     scene.GetLights()[lu],
-                    scene.GetObjects()
+                    scene.GetObjects(),
+                    rng
                 ) * static_cast<double>(scene.GetLights().size());
 
                 auto [indirectDirLocal, pdf] = SampleCosinus(rng);
@@ -222,7 +262,7 @@ std::optional<Color> Sphere::SubRadiance(const Ray& ray, Scene& scene, int depth
 
                 Ray indirectRay(intersectionPoint + RayTracer::EPSILON * indirectDir, indirectDir);
                 std::optional<Color> indirectOpt = Sphere::RadianceSpheres(
-                    indirectRay, scene, depth + 1, rng
+                    indirectRay, scene, depth + 1, false, rng
                 );
 
                 Color indirect = indirectOpt.value_or(Color(0, 0, 0));
@@ -235,7 +275,16 @@ std::optional<Color> Sphere::SubRadiance(const Ray& ray, Scene& scene, int depth
 
                 double coefIndirect = indirectDir.Dot(normal) / (std::numbers::pi * pdf);
 
-                return directLightContrib + indirectFinal * coefIndirect;
+                Color emission;
+                if (lastWasSpecular)
+                {
+                    emission = hitSphere->GetMaterial().GetEmission();
+                }
+                else
+                {
+                    emission = Color(0, 0, 0);
+                }
+                return directLightContrib + indirectFinal * coefIndirect + emission;
             }
             case (MaterialBehavior::Glass):
             {
@@ -274,6 +323,7 @@ std::optional<Color> Sphere::SubRadiance(const Ray& ray, Scene& scene, int depth
                         transmittedRay,
 						scene,
                         depth + 1,
+                        true,
                         rng
                     );
 
@@ -326,6 +376,7 @@ std::optional<Color> Sphere::MirrorContribution(const Point& intersectionPoint,
         reflectedRay,
 		scene,
         depth + 1,
+        true,
         rng
     );
 

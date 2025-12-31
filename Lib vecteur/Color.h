@@ -17,6 +17,9 @@ public:
     double GetB() const { return m_b; }
     double GetA() const { return m_a; }
 
+    bool operator==(const Color& other) const;
+    bool operator!=(const Color& other) const;
+
     static Color Tonemap(double r, double g, double b, double a);
     static Color Tonemap(Color color);
     static double LinearToSRGB(double c);

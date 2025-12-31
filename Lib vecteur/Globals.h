@@ -6,7 +6,7 @@ namespace RayTracer
 {
     constexpr auto NO_INTERSECTION = -1;
 	constexpr int MAX_DEPTH = 5;
-	constexpr int SAMPLES_PER_PIXEL = 200;
+	constexpr int SAMPLES_PER_PIXEL = 100;
 	constexpr double EPSILON = 0.0001;
 }
 

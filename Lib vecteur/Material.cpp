@@ -1,12 +1,13 @@
 #include "Material.h"
 #include "Operators.h"
 
-Material::Material(double r, double g, double b, MaterialBehavior behavior, double ior)
+Material::Material(double r, double g, double b, MaterialBehavior behavior, Color emission, double ior)
 {
 	m_r = r;
 	m_g = g;
 	m_b = b;
 	m_behavior = behavior;
+    m_emission = emission;
 	m_ior = ior;
 }
 
