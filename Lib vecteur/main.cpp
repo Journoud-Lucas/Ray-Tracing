@@ -102,6 +102,7 @@ int main()
 
     Color black(0, 0, 0);
 
+    /*
     scene.AddObject(Sphere(Point(sphereRadius + 500, 250, 0), sphereRadius, Material(0.6, 0.6, 0, MaterialBehavior::Diffuse, black))); // Right
     scene.AddObject(Sphere(Point(-sphereRadius, 250, 0), sphereRadius, Material(0, 0.6, 0.6, MaterialBehavior::Diffuse, black))); // Left
     scene.AddObject(Sphere(Point(250, -sphereRadius, 0), sphereRadius, Material(0.6, 0.6, 0.6, MaterialBehavior::Diffuse, black))); // Top
@@ -110,12 +111,27 @@ int main()
     scene.AddObject(Sphere(Point(150, 350, 250), 100, Material(1, 1, 1, MaterialBehavior::Mirror, black))); // Sphere 1
     scene.AddObject(Sphere(Point(350, 350, 250), 100, Material(1, 1, 1, MaterialBehavior::Glass, black, 2.4))); // Sphere 2
     scene.AddObject(Sphere(Point(250, 150, 250), 30, Material(1.0, 1.0, 1.0, MaterialBehavior::Diffuse, Color(10000, 10000, 10000)))); // Small sphere for light
+    */
 
+    double dd = 100;
+    Material whiteMat(1.0, 1.0, 1.0, MaterialBehavior::Diffuse, black);
+    for (double x = 0.0; x <= 500.0; x += dd)
+    {
+        for (double y = 0.0; y <= 500.0; y += dd)
+        {
+            for (double z = 0.0; z <= 500.0; z += dd)
+            {
+                scene.AddObject(Sphere(Point(x, y, z), 10.0, whiteMat));
+            }
+        }
+    }
 
     scene.AddLight(Light(LightBehavior(Point(50, 250, 250)), Color(30000, 10000, 10000)));
     scene.AddLight(Light(LightBehavior(Point(450, 250, 250)), Color(10000, 10000, 30000)));
 
 
+    // Not use anymore
+    // Since every sphere can produce light
     /*
     for (const Light& light : scene.GetLights())
     {
