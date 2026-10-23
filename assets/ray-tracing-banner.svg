@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="260" viewBox="0 0 1200 260" role="img" aria-labelledby="title">
+  <title id="title">Ray Tracing Engine — CPU Path Tracer — Lucas Journoud</title>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1424"/><stop offset="1" stop-color="#142d44"/></linearGradient>
+    <linearGradient id="glass"><stop stop-color="#5eead4" stop-opacity=".22"/><stop offset="1" stop-color="#38bdf8" stop-opacity=".03"/></linearGradient>
+  </defs>
+  <rect width="1200" height="260" rx="18" fill="url(#bg)"/>
+  <path d="M50 50H82" stroke="#5eead4" stroke-width="4"/>
+  <text x="97" y="55" fill="#9fb5ca" font-family="Arial, sans-serif" font-size="13" letter-spacing="3">GRAPHICS / C++ / PARALLEL COMPUTING</text>
+  <text x="48" y="128" fill="#f2f7fc" font-family="Arial, sans-serif" font-weight="700" font-size="51">Ray Tracing Engine</text>
+  <text x="51" y="173" fill="#5eead4" font-family="Arial, sans-serif" font-size="24">Du rayon lumineux au pixel.</text>
+  <text x="52" y="220" fill="#a6bdcf" font-family="Arial, sans-serif" font-size="15">CPU PATH TRACER  /  LUCAS JOURNOUD</text>
+  <circle cx="960" cy="132" r="77" fill="url(#glass)" stroke="#5eead4" stroke-width="1.5"/>
+  <path d="M775 49L898 86 1025 92 1161 33M775 215L892 166 1027 166 1162 217" fill="none" stroke="#5eead4" stroke-width="2"/>
+  <path d="M898 86L831 8M892 166L843 250" fill="none" stroke="#38bdf8" opacity=".55"/>
+  <circle cx="898" cy="86" r="4" fill="#5eead4"/><circle cx="892" cy="166" r="4" fill="#5eead4"/>
+  <text x="921" y="142" fill="#e8f8ff" font-family="Consolas, monospace" font-size="28">C++</text>
+</svg>
